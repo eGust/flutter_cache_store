@@ -1,0 +1,17 @@
+name: flutter_cache_store
+description: More configurable cache manager for Flutter
+version: 0.0.1
+author: eGust<egustc@gmail.com>
+homepage: https://github.com/eGust/flutter_cache_store
+
+environment:
+  sdk: ">=2.0.0-dev.68.0 <3.0.0"
+  flutter: ">=0.1.4 <2.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: "^0.4.0"
+  path_provider: "^0.4.0"
+  synchronized: "^1.5.0"
+  http: any
