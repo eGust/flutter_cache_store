@@ -39,9 +39,13 @@ class CacheStore {
 
   Future<void> _init(final bool clearNow) async {
     final Map<String, dynamic> data = jsonDecode(_prefs.getString(_PREF_KEY) ?? '{}');
-    final items = (data['cache'] as List).map((json) => CacheItem.fromJson(json));
+    final items = (data['cache'] as List ?? [])
+                    .map((json) => CacheItem.fromJson(json))
+                    .toList();
 
-    (await _adapter.restore(items)).forEach((item) => _cache[item.key] = item);
+    (await _adapter.restore(items))
+      .where((item) => item.key != null && item.filename != null)
+      .forEach((item) => _cache[item.key] = item);
     if (clearNow) {
       await _cleanup();
     }
@@ -63,13 +67,15 @@ class CacheStore {
   static final _itemLock = new Lock();
 
   Future<CacheItem> _getItem(String key) async {
-    var item = CacheItem(key: key);
+    var item = _cache[key];
     if (item != null) return item;
 
     await _itemLock.synchronized(() {
+      item = _cache[key];
       if (item != null) return;
 
       item = CacheItem(key: key, filename: _adapter.generateFilename());
+      _cache[key] = item;
       _adapter.onAdded(item);
     });
     return item;
@@ -77,6 +83,7 @@ class CacheStore {
 
   static bool _cleaning = false;
   static final _cleanLock = new Lock();
+  String _lastCache;
 
   Future<void> _cleanup() async {
     final removedKeys = await _adapter.cleanup(_cache.values);
@@ -88,7 +95,11 @@ class CacheStore {
       }
     }));
 
-    await _prefs.setString(_PREF_KEY, jsonEncode({ 'cache': _cache.values }));
+    final cacheString = jsonEncode({ 'cache': _cache.values.toList() });
+    if (_lastCache == cacheString) return;
+
+    _lastCache = cacheString;
+    await _prefs.setString(_PREF_KEY, cacheString);
   }
 
   Future<void> _delayCleanUp() =>

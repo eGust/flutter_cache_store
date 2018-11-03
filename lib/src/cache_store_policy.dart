@@ -56,7 +56,7 @@ class LessRecentlyUsedPolicy extends CacheStorePolicy {
   }
 
   Future<Iterable<CacheItem>> restore(List<CacheItem> items) async {
-    Map<String, dynamic> stored = jsonDecode(CacheStore.prefs.getString(_KEY));
+    Map<String, dynamic> stored = jsonDecode(CacheStore.prefs.getString(_KEY) ?? '{}');
     final now = DateTime.now().millisecondsSinceEpoch;
     return items.map((item) {
       final p = LRUPayload();

@@ -13,7 +13,7 @@ class Utils {
   static int _c64(final int x) {
     if (x < 10) return 48 + x;
     if (x < 36) return 65 + x - 10;
-    return 95 + x - 10;
+    return 95 + x - 36;
   }
 
   static int genNow() => DateTime.now().microsecondsSinceEpoch & _EFF_TIME_FLAG;
@@ -21,15 +21,15 @@ class Utils {
   static String genName() {
     final codes = List<int>(11);
     var x = genUniqId();
-    codes[0] = _c64((x >> 60) & 0x0F);
+    codes[0] = _c64(((x & 0x7000000000000000) >> 60) | (x < 0 ? 8 : 0));
     x &= (1 << 60) - 1;
-    for (var i = 10; i >= 0; i -= 1, x >>= 6) {
+    for (var i = 10; i > 0; i -= 1, x >>= 6) {
       codes[i] = _c64(x & 0x3F);
     }
     return String.fromCharCodes(codes);
   }
 
-  static int genUniqId() => (_rand.nextInt(0x40000) << 45) | genNow();
+  static int genUniqId() => (_rand.nextInt(0x80000) << 45) | genNow();
 
   static final _downloadLocks = <String, Lock>{};
 
