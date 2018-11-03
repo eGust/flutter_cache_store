@@ -1,20 +1,24 @@
 part of flutter_cache_store;
 
+abstract class CacheItemPayload {}
+
 class CacheItem {
-  CacheItem({this.key, String filename, DateTime accessedAt})
-      : this.filename = filename ?? _NameGenerator.next(),
-        this.accessedAt = accessedAt ?? DateTime.now();
+  static String _rootPath;
+
+  CacheItem({this.key, this.filename});
+
   final String key, filename;
-  DateTime accessedAt;
+  CacheItemPayload payload;
+
+  String get fullPath => '$_rootPath/$filename';
 
   Map<String, dynamic> toJson() => {
         'key': key,
         'filename': filename,
-        'accessedAt': accessedAt.toIso8601String(),
       };
 
-  static CacheItem fromJson(Map<String, dynamic> json) => CacheItem(
-      key: json['key'],
-      filename: json['filename'],
-      accessedAt: DateTime.parse(json['accessedAt']));
+  CacheItem.fromJson(Map<String, dynamic> json)
+      : key = json['k']
+      , filename = json['fn']
+      ;
 }

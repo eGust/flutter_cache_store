@@ -1,158 +1,134 @@
 part of flutter_cache_store;
 
 class CacheStore {
-  CacheStore._(this.storeName, this.maxCount, this.maxExpiration);
-  final String storeName;
-  final int maxCount;
-  final Duration maxExpiration;
+  CacheStore._();
 
-  static const _NANED_STORES = <String, CacheStore>{};
   static final _lockCreation = new Lock();
   static SharedPreferences _prefs;
-  static String _tmpPath;
+  static CacheStore _instance;
+  static CacheStorePolicy _adapter;
 
-  static Future<CacheStore> getStoreInstance(
-      {final String name,
-      final bool clearExpired = false,
-      final maxCount = 200,
-      final Duration maxExpiration = const Duration(days: 7)}) async {
-    final storeName = name ?? _DEFAULT_STORE_NAME;
-    var store = _NANED_STORES[storeName];
+  static SharedPreferences get prefs => _prefs;
 
-    if (store == null) {
+  static void setAdapter(final CacheStorePolicy adapter) {
+    if (_instance != null) throw Exception('Cache store already been instantiated');
+    if (adapter == null) throw Exception('Cannot pass null adapter');
+    _adapter = adapter;
+  }
+
+  static Future<CacheStore> getInstance({ final bool clearNow = false }) async {
+    if (_instance == null) {
       await _lockCreation.synchronized(() async {
-        store = _NANED_STORES[storeName];
-        if (store != null) return;
+        if (_instance != null) return;
 
-        store = CacheStore._(storeName, maxCount, maxExpiration);
-        _tmpPath ??= (await getTemporaryDirectory()).path;
-        _prefs ??= await SharedPreferences.getInstance();
-        await store._restoreOrInitData();
-        _NANED_STORES[storeName] = store;
+        final tmpPath = (await getTemporaryDirectory()).path;
+        CacheItem._rootPath = '$tmpPath/$_DEFAULT_STORE_FOLDER';
+        _prefs = await SharedPreferences.getInstance();
+        _adapter ??= LessRecentlyUsedPolicy();
+
+        _instance = CacheStore._();
+        await _instance._init(clearNow);
       });
     }
 
-    if (clearExpired) {
-      await store._clear();
-    }
-    return store;
+    return _instance;
   }
 
-  String get folderPath => "$_tmpPath$_folder";
-  String get storeKey => "$_PREF_KEY:$storeName";
+  static const _PREF_KEY = 'CACHE_STORE';
+  static const _DEFAULT_STORE_FOLDER = 'cache_store';
 
-  Future<void> _restoreOrInitData() async {
-    final savedData = _prefs.getString(storeKey);
-    final Map<String, dynamic> json = jsonDecode(savedData ?? '{}');
-    _folder = json['folder'] ?? _NameGenerator.next();
-    _items = (json['items'] ?? []).map(CacheItem.fromJson);
-    _items.forEach((item) => _cache[item.key] = item);
+  Future<void> _init(final bool clearNow) async {
+    final Map<String, dynamic> data = jsonDecode(_prefs.getString(_PREF_KEY) ?? '{}');
+    final items = (data['cache'] as List).map((json) => CacheItem.fromJson(json));
+
+    (await _adapter.restore(items)).forEach((item) => _cache[item.key] = item);
+    if (clearNow) {
+      await _cleanup();
+    }
   }
 
   final _cache = <String, CacheItem>{};
-  List<CacheItem> _items;
-  String _folder;
 
-  static const _PREF_KEY = '__CACHE_STORE';
-  static const _DEFAULT_STORE_NAME = '__DEFAULT';
-
-  Future<File> getFile(final String url,
-      {final Map<String, String> headers, final String key}) async {
+  Future<File> getFile(final String url, {
+      final Map<String, String> headers,
+      final String key,
+    }) async {
     final itemKey = key ?? url;
-    final item = _cache[itemKey] ?? await _newItem(itemKey);
-    final file = File("$folderPath/${item.filename}");
-    if (!(await file.exists())) {
-      await _download(file, url, headers);
-    }
-    item.accessedAt = DateTime.now();
-    return file;
+    final item = await _getItem(itemKey);
+    _adapter.onAccessed(item);
+    _delayCleanUp();
+    return Utils.download(item, url, headers);
   }
 
-  static final _lockItem = new Lock();
+  static final _itemLock = new Lock();
 
-  Future<CacheItem> _newItem(final String key) async {
-    CacheItem item;
-    await _lockItem.synchronized(() async {
-      item = _cache[key];
+  Future<CacheItem> _getItem(String key) async {
+    var item = CacheItem(key: key);
+    if (item != null) return item;
+
+    await _itemLock.synchronized(() {
       if (item != null) return;
 
-      item = CacheItem(key: key);
-      _cache[key] = item;
-      _items.add(item);
-      _tryClean();
+      item = CacheItem(key: key, filename: _adapter.generateFilename());
+      _adapter.onAdded(item);
     });
     return item;
   }
 
-  static final _downloadLocks = <String, Lock>{};
+  static bool _cleaning = false;
+  static final _cleanLock = new Lock();
 
-  Future<void> _download(
-      File file, String url, Map<String, String> headers) async {
-    var lock = _downloadLocks[file.path];
-    if (lock == null) {
-      lock = Lock();
-      _downloadLocks[file.path] = lock;
-      await lock.synchronized(() async {
-        final objs = await Future.wait([
-          file.create(recursive: true),
-          http.get(url, headers: headers),
-        ]);
+  Future<void> _cleanup() async {
+    final removedKeys = await _adapter.cleanup(_cache.values);
+    await Future.wait(removedKeys.map((key) async {
+      final item = _cache.remove(key);
+      final file = File(item.fullPath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }));
 
-        final File f = objs.first;
-        final http.Response response = objs.last;
-        f.writeAsBytesSync(response.bodyBytes);
-      });
-      _downloadLocks.remove(file.path);
-    } else {
-      await lock.synchronized(() {});
-    }
+    await _prefs.setString(_PREF_KEY, jsonEncode({ 'cache': _cache.values }));
   }
 
-  static final _lockClean = new Lock();
+  Future<void> _delayCleanUp() =>
+    Future.delayed(const Duration(seconds: 1), () async {
+      if (_cleaning) return;
+      await _cleanLock.synchronized(() async {
+        if (_cleaning) return;
 
-  void _tryClean() => _lockClean.synchronized(() async {
-        if (_items.length > maxCount) {
-          await _clear();
+        _cleaning = true;
+        try {
+          await _cleanup();
+        } finally {
+          _cleaning = false;
         }
       });
+    });
 
-  Future<void> _save() => _prefs.setString(
-        storeKey,
-        jsonEncode({
-          'folder': _folder,
-          'items': _items,
-        }),
-      );
-
-  Future<void> _clear({bool all = false}) async {
-    final items = <CacheItem>[];
-    if (all) {
-      items.addAll(_items);
-      _items = [];
-      _cache.clear();
-      Directory(folderPath).deleteSync(recursive: true);
-    } else {
-      _items.sort((a, b) => b.accessedAt.compareTo(a.accessedAt));
-      var deleteFrom = maxCount;
-
-      if (maxExpiration != null) {
-        final expired = DateTime.now().subtract(maxExpiration);
-        final index =
-            _items.indexWhere((item) => item.accessedAt.isBefore(expired));
-        deleteFrom = min(deleteFrom, index < 0 ? deleteFrom : index);
-      }
-
-      items.addAll(_items.sublist(deleteFrom));
-      _items.removeRange(deleteFrom, _items.length);
-      await Future.wait(items.map((item) async {
-        _cache.remove(item.key);
-        await File("$folderPath/${item.filename}").delete();
-      }));
+  Future<void> clearAll() async {
+    if (_cleaning) {
+      await _cleanLock.synchronized(() {});
     }
-    await _save();
+
+    await _cleanLock.synchronized(() async {
+      _cleaning = true;
+      try {
+        final items = _cache.values.toList();
+        _cache.clear();
+
+        final cleared = items.map((item) async {
+          final file = File(item.fullPath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        }).toList();
+
+        cleared.add(_adapter.clearAll(items));
+        await Future.wait(cleared);
+      } finally {
+        _cleaning = false;
+      }
+    });
   }
-
-  Future<void> clearExpired() => _lockClean.synchronized(_clear);
-
-  Future<void> clearAll() => _lockClean.synchronized(() => _clear(all: true));
 }

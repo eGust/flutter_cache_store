@@ -4,4 +4,6 @@
 .packages
 .pub/
 .dart_tool/
+android/
+ios/
 pubspec.lock
