@@ -81,65 +81,55 @@ class CacheStore {
     return item;
   }
 
-  static bool _cleaning = false;
+  static bool _delayedCleaning = false;
   static final _cleanLock = new Lock();
-  String _lastCache;
+  int _lastCacheHash;
 
-  Future<void> _cleanup() async {
-    final removedKeys = await _adapter.cleanup(_cache.values);
-    await Future.wait(removedKeys.map((key) async {
-      final item = _cache.remove(key);
-      final file = File(item.fullPath);
-      if (await file.exists()) {
-        await file.delete();
-      }
-    }));
+  Future<void> _cleanup() =>
+    _cleanLock.synchronized(() async {
+      final removedKeys = await _adapter.cleanup(_cache.values);
+      await Future.wait(removedKeys.map((key) async {
+        final item = _cache.remove(key);
+        final file = File(item.fullPath);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      }));
 
-    final cacheString = jsonEncode({ 'cache': _cache.values.toList() });
-    if (_lastCache == cacheString) return;
+      final cacheString = jsonEncode({ 'cache': _cache.values.toList() });
+      if (_lastCacheHash == cacheString.hashCode) return;
 
-    _lastCache = cacheString;
-    await _prefs.setString(_PREF_KEY, cacheString);
+      _lastCacheHash = cacheString.hashCode;
+      await _prefs.setString(_PREF_KEY, cacheString);
+    });
+
+  static const _DELAY_DURATION = Duration(seconds: 60);
+
+  Future<void> _delayCleanUp() async {
+    if (_delayedCleaning) return;
+
+    _delayedCleaning = true;
+    await Future.delayed(_DELAY_DURATION, () async {
+      _delayedCleaning = false;
+      await _cleanup();
+    });
   }
 
-  Future<void> _delayCleanUp() =>
-    Future.delayed(const Duration(seconds: 1), () async {
-      if (_cleaning) return;
-      await _cleanLock.synchronized(() async {
-        if (_cleaning) return;
+  Future<void> clearAll() =>
+    _cleanLock.synchronized(() async {
+      final items = _cache.values.toList();
+      _cache.clear();
 
-        _cleaning = true;
-        try {
-          await _cleanup();
-        } finally {
-          _cleaning = false;
-        }
-      });
+      await Future.wait([
+        _removeCacheFolder(),
+        _adapter.clearAll(items),
+      ]);
     });
 
-  Future<void> clearAll() async {
-    if (_cleaning) {
-      await _cleanLock.synchronized(() {});
+  Future<void> _removeCacheFolder() async {
+    final dir = Directory(CacheItem._rootPath);
+    if (await dir.exists()) {
+      await dir.delete(recursive: true);
     }
-
-    await _cleanLock.synchronized(() async {
-      _cleaning = true;
-      try {
-        final items = _cache.values.toList();
-        _cache.clear();
-
-        final cleared = items.map((item) async {
-          final file = File(item.fullPath);
-          if (await file.exists()) {
-            await file.delete();
-          }
-        }).toList();
-
-        cleared.add(_adapter.clearAll(items));
-        await Future.wait(cleared);
-      } finally {
-        _cleaning = false;
-      }
-    });
   }
 }

@@ -31,8 +31,8 @@ class LessRecentlyUsedPolicy extends CacheStorePolicy {
     final timestamps = <String, dynamic>{};
     items.forEach((item) {
       final LRUPayload p = item.payload;
-      final ts = p?.accessedAt;
-      timestamps[item.key] = ts?.toString();
+      final ts = p?.accessedAt ?? DateTime.now().millisecondsSinceEpoch;
+      timestamps[item.key] = ts.toString();
     });
 
     await CacheStore.prefs.setString(_KEY, jsonEncode(timestamps));
