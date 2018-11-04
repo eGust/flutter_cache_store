@@ -33,16 +33,16 @@ class Utils {
 
   static final _downloadLocks = <String, Lock>{};
 
-  static Future<File> download(CacheItem item,
-      String url,
-      Map<String, String> headers,
-      bool useCache,
-      OnDownloaded onDownloaded,
-    ) async {
+  static Future<File> download(
+    CacheItem item,
+    String url,
+    Map<String, String> headers,
+    bool useCache,
+    OnDownloaded onDownloaded,
+  ) async {
     final file = File(item.fullPath);
-    if (useCache && (
-      await file.exists() ||
-      await file.length() == 0 )) return file;
+    if (useCache && (await file.exists() || await file.length() == 0))
+      return file;
 
     var lock = _downloadLocks[item.filename];
     if (lock == null) {

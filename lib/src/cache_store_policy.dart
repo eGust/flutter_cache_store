@@ -9,10 +9,12 @@ abstract class CacheStorePolicy {
   Future<void> onAdded(final CacheItem addedItem) async {}
   Future<void> onAccessed(final CacheItem accessedItem, bool flushed) async {}
   Future<void> onFlushed(final Iterable<CacheItem> flushedItems) async {}
-  Future<void> onDownloaded(final CacheItem item, final Map<String, String> headers) async {}
+  Future<void> onDownloaded(
+      final CacheItem item, final Map<String, String> headers) async {}
 
   Future<Iterable<CacheItem>> cleanup(Iterable<CacheItem> allItems);
-  Future<Iterable<CacheItem>> restore(List<CacheItem> allItems) async => allItems;
+  Future<Iterable<CacheItem>> restore(List<CacheItem> allItems) async =>
+      allItems;
 }
 
 class LRUPayload extends CacheItemPayload {
@@ -21,7 +23,7 @@ class LRUPayload extends CacheItemPayload {
 
 class LessRecentlyUsedPolicy extends CacheStorePolicy {
   static const _KEY = 'CACHE_STORE:LRU';
-  LessRecentlyUsedPolicy({ this.maxCount = 999 });
+  LessRecentlyUsedPolicy({this.maxCount = 999});
 
   final int maxCount;
 
@@ -60,7 +62,8 @@ class LessRecentlyUsedPolicy extends CacheStorePolicy {
   }
 
   Future<Iterable<CacheItem>> restore(List<CacheItem> allItems) async {
-    Map<String, dynamic> stored = jsonDecode(CacheStore.prefs.getString(_KEY) ?? '{}');
+    Map<String, dynamic> stored =
+        jsonDecode(CacheStore.prefs.getString(_KEY) ?? '{}');
     final now = DateTime.now().millisecondsSinceEpoch;
     return allItems.map((item) {
       final p = LRUPayload();

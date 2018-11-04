@@ -19,7 +19,6 @@ class CacheItem {
       };
 
   CacheItem.fromJson(Map<String, dynamic> json)
-      : key = json['k']
-      , filename = json['fn']
-      ;
+      : key = json['k'],
+        filename = json['fn'];
 }

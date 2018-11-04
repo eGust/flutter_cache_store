@@ -24,20 +24,20 @@ void demo(String url) async {
 void api() async {
   // set expiration policy.
   // must be called before `CacheStore.getInstance` or will raise an exception.
-  // default: LessRecentlyUsedPolicy(maxCount: 200)
-  CacheStore.setPolicy(policy);
+  // default: LessRecentlyUsedPolicy(maxCount: 999)
+  CacheStore.setPolicy(LessRecentlyUsedPolicy(maxCount: 4096));
 
   // get a singleton store instance
   CacheStore store = await CacheStore.getInstance(
-    clearNow: true // default: false - where to collect expired cache immediately
-  );
+      clearNow: true // default: false - whethere to clean up immediately
+      );
 
   // fetch a file from an URL and cache it
   File file = await store.getFile(
-    'url',              // GET method
-    key: null,          // use custom string instead of URL
-    headers: {},        // same as http.get
-    flushCache: false,  // whether to re-download the file
+    'url', // GET method
+    key: null, // use custom string instead of URL
+    headers: {}, // same as http.get
+    flushCache: false, // whether to re-download the file
   );
 
   // flush specific files by keys
