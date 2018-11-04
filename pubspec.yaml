@@ -1,6 +1,6 @@
 name: flutter_cache_store
 description: More configurable cache manager for Flutter
-version: 0.0.3
+version: 0.0.4-beta
 author: eGust<egustc@gmail.com>
 homepage: https://github.com/eGust/flutter_cache_store
 

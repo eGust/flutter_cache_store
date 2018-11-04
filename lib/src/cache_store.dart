@@ -6,14 +6,14 @@ class CacheStore {
   static final _lockCreation = new Lock();
   static SharedPreferences _prefs;
   static CacheStore _instance;
-  static CacheStorePolicy _adapter;
+  static CacheStorePolicy _policyManager;
 
   static SharedPreferences get prefs => _prefs;
 
-  static void setAdapter(final CacheStorePolicy adapter) {
+  static void setPolicy(final CacheStorePolicy policy) {
     if (_instance != null) throw Exception('Cache store already been instantiated');
-    if (adapter == null) throw Exception('Cannot pass null adapter');
-    _adapter = adapter;
+    if (policy == null) throw Exception('Cannot pass null policy');
+    _policyManager = policy;
   }
 
   static Future<CacheStore> getInstance({ final bool clearNow = false }) async {
@@ -24,7 +24,7 @@ class CacheStore {
         final tmpPath = (await getTemporaryDirectory()).path;
         CacheItem._rootPath = '$tmpPath/$_DEFAULT_STORE_FOLDER';
         _prefs = await SharedPreferences.getInstance();
-        _adapter ??= LessRecentlyUsedPolicy();
+        _policyManager ??= LessRecentlyUsedPolicy();
 
         _instance = CacheStore._();
         await _instance._init(clearNow);
@@ -36,6 +36,7 @@ class CacheStore {
 
   static const _PREF_KEY = 'CACHE_STORE';
   static const _DEFAULT_STORE_FOLDER = 'cache_store';
+  static List<CacheItem> _recycledItems;
 
   Future<void> _init(final bool clearNow) async {
     final Map<String, dynamic> data = jsonDecode(_prefs.getString(_PREF_KEY) ?? '{}');
@@ -43,9 +44,13 @@ class CacheStore {
                     .map((json) => CacheItem.fromJson(json))
                     .toList();
 
-    (await _adapter.restore(items))
+    (await _policyManager.restore(items))
       .where((item) => item.key != null && item.filename != null)
       .forEach((item) => _cache[item.key] = item);
+
+    final recycled = items.where((item) => !_cache.containsKey(item.key)).toList();
+    _recycledItems = recycled.isEmpty ? null : recycled;
+
     if (clearNow) {
       await _cleanup();
     }
@@ -56,12 +61,27 @@ class CacheStore {
   Future<File> getFile(final String url, {
       final Map<String, String> headers,
       final String key,
+      final bool flushCache = false,
     }) async {
     final itemKey = key ?? url;
     final item = await _getItem(itemKey);
-    _adapter.onAccessed(item);
+    _policyManager.onAccessed(item, flushCache);
     _delayCleanUp();
-    return Utils.download(item, url, headers);
+    return Utils.download(
+      item,
+      url,
+      headers,
+      !flushCache,
+      _policyManager.onDownloaded
+    );
+  }
+
+  Future<void> flush(final List<String> urlOrKeys) {
+    final items = urlOrKeys.map((key) => _cache[key])
+                    .where((item) => item != null).toList();
+    final futures = items.map(_removeFile).toList();
+    futures.add(_policyManager.onFlushed(items));
+    return Future.wait(futures);
   }
 
   static final _itemLock = new Lock();
@@ -74,9 +94,9 @@ class CacheStore {
       item = _cache[key];
       if (item != null) return;
 
-      item = CacheItem(key: key, filename: _adapter.generateFilename());
+      item = CacheItem(key: key, filename: _policyManager.generateFilename());
       _cache[key] = item;
-      _adapter.onAdded(item);
+      _policyManager.onAdded(item);
     });
     return item;
   }
@@ -85,16 +105,23 @@ class CacheStore {
   static final _cleanLock = new Lock();
   int _lastCacheHash;
 
+  Future<void> _removeFile(CacheItem item) async {
+    final file = File(item.fullPath);
+    if (await file.exists()) {
+      await file.delete();
+    }
+  }
+
   Future<void> _cleanup() =>
     _cleanLock.synchronized(() async {
-      final removedKeys = await _adapter.cleanup(_cache.values);
-      await Future.wait(removedKeys.map((key) async {
-        final item = _cache.remove(key);
-        final file = File(item.fullPath);
-        if (await file.exists()) {
-          await file.delete();
-        }
-      }));
+      if (_recycledItems != null) {
+        final items = _recycledItems;
+        _recycledItems = null;
+        await Future.wait(items.map(_removeFile));
+      }
+
+      final removedKeys = await _policyManager.cleanup(_cache.values);
+      await Future.wait(removedKeys.map((item) => _removeFile(_cache.remove(item.key))));
 
       final cacheString = jsonEncode({ 'cache': _cache.values.toList() });
       if (_lastCacheHash == cacheString.hashCode) return;
@@ -122,7 +149,7 @@ class CacheStore {
 
       await Future.wait([
         _removeCacheFolder(),
-        _adapter.clearAll(items),
+        _policyManager.clearAll(items),
       ]);
     });
 

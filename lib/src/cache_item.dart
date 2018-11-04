@@ -4,6 +4,7 @@ abstract class CacheItemPayload {}
 
 class CacheItem {
   static String _rootPath;
+  static String get rootPath => _rootPath;
 
   CacheItem({this.key, this.filename});
 

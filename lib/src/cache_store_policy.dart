@@ -1,14 +1,18 @@
 part of flutter_cache_store;
 
+typedef OnDownloaded = Future<void> Function(CacheItem, Map<String, String>);
+
 abstract class CacheStorePolicy {
   String generateFilename() => Utils.genName();
-  Future<void> clearAll(Iterable<CacheItem> items) async {}
+  Future<void> clearAll(Iterable<CacheItem> allItems) async {}
 
-  Future<void> onAdded(final CacheItem item) async {}
-  Future<void> onAccessed(final CacheItem item) async {}
+  Future<void> onAdded(final CacheItem addedItem) async {}
+  Future<void> onAccessed(final CacheItem accessedItem, bool flushed) async {}
+  Future<void> onFlushed(final Iterable<CacheItem> flushedItems) async {}
+  Future<void> onDownloaded(final CacheItem item, final Map<String, String> headers) async {}
 
-  Future<Iterable<String>> cleanup(Iterable<CacheItem> items);
-  Future<Iterable<CacheItem>> restore(List<CacheItem> items) async => items;
+  Future<Iterable<CacheItem>> cleanup(Iterable<CacheItem> allItems);
+  Future<Iterable<CacheItem>> restore(List<CacheItem> allItems) async => allItems;
 }
 
 class LRUPayload extends CacheItemPayload {
@@ -17,13 +21,13 @@ class LRUPayload extends CacheItemPayload {
 
 class LessRecentlyUsedPolicy extends CacheStorePolicy {
   static const _KEY = 'CACHE_STORE:LRU';
-  LessRecentlyUsedPolicy({ this.maxCount = 200 });
+  LessRecentlyUsedPolicy({ this.maxCount = 999 });
 
   final int maxCount;
 
-  Future<void> onAccessed(final CacheItem item) async {
-    final LRUPayload payload = item.payload ?? LRUPayload();
-    item.payload = payload;
+  Future<void> onAccessed(final CacheItem accessedItem, bool flushed) async {
+    final LRUPayload payload = accessedItem.payload ?? LRUPayload();
+    accessedItem.payload = payload;
     payload.accessedAt = DateTime.now().millisecondsSinceEpoch;
   }
 
@@ -38,8 +42,8 @@ class LessRecentlyUsedPolicy extends CacheStorePolicy {
     await CacheStore.prefs.setString(_KEY, jsonEncode(timestamps));
   }
 
-  Future<Iterable<String>> cleanup(Iterable<CacheItem> items) async {
-    final list = items.toList();
+  Future<Iterable<CacheItem>> cleanup(Iterable<CacheItem> allItems) async {
+    final list = allItems.toList();
     if (list.length <= maxCount) {
       _save(list);
       return [];
@@ -52,13 +56,13 @@ class LessRecentlyUsedPolicy extends CacheStorePolicy {
     });
 
     _save(list.sublist(0, maxCount));
-    return list.sublist(maxCount).map((item) => item.key);
+    return list.sublist(maxCount);
   }
 
-  Future<Iterable<CacheItem>> restore(List<CacheItem> items) async {
+  Future<Iterable<CacheItem>> restore(List<CacheItem> allItems) async {
     Map<String, dynamic> stored = jsonDecode(CacheStore.prefs.getString(_KEY) ?? '{}');
     final now = DateTime.now().millisecondsSinceEpoch;
-    return items.map((item) {
+    return allItems.map((item) {
       final p = LRUPayload();
       final String ts = stored[item.key];
       p.accessedAt = ts == null ? now : int.parse(ts);

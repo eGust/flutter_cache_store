@@ -33,9 +33,16 @@ class Utils {
 
   static final _downloadLocks = <String, Lock>{};
 
-  static Future<File> download(CacheItem item, String url, Map<String, String> headers) async {
+  static Future<File> download(CacheItem item,
+      String url,
+      Map<String, String> headers,
+      bool useCache,
+      OnDownloaded onDownloaded,
+    ) async {
     final file = File(item.fullPath);
-    if (await file.exists()) return file;
+    if (useCache && (
+      await file.exists() ||
+      await file.length() == 0 )) return file;
 
     var lock = _downloadLocks[item.filename];
     if (lock == null) {
@@ -50,7 +57,11 @@ class Utils {
 
           final File f = objs.first;
           final http.Response response = objs.last;
-          await f.writeAsBytes(response.bodyBytes);
+
+          await Future.wait([
+            onDownloaded(item, response.headers),
+            f.writeAsBytes(response.bodyBytes),
+          ]);
         });
       } finally {
         _downloadLocks.remove(item.filename);
