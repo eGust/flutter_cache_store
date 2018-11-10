@@ -44,8 +44,10 @@ class Utils {
     final key = item.filename;
     if (useCache &&
         await file.exists() &&
-        (_downloadLocks.containsKey(key) || await file.length() != 0))
+        ((_downloadLocks.containsKey(key) && _downloadLocks[key] == null) ||
+            await file.length() != 0)) {
       return file;
+    }
 
     var lock = _downloadLocks[key];
     if (lock == null) {
