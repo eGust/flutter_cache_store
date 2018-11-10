@@ -41,13 +41,16 @@ class Utils {
     OnDownloaded onDownloaded,
   ) async {
     final file = File(item.fullPath);
-    if (useCache && await file.exists() && await file.length() != 0)
+    final key = item.filename;
+    if (useCache &&
+        await file.exists() &&
+        (_downloadLocks.containsKey(key) || await file.length() != 0))
       return file;
 
-    var lock = _downloadLocks[item.filename];
+    var lock = _downloadLocks[key];
     if (lock == null) {
       lock = Lock();
-      _downloadLocks[item.filename] = lock;
+      _downloadLocks[key] = lock;
       try {
         await lock.synchronized(() async {
           final objs = await Future.wait([
@@ -64,7 +67,7 @@ class Utils {
           ]);
         });
       } finally {
-        _downloadLocks.remove(item.filename);
+        _downloadLocks[key] = null;
       }
     } else {
       await lock.synchronized(() {});

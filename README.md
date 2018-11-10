@@ -66,7 +66,7 @@ void api() async {
     );
     ```
 
-    > The current version is super naive. It's simply sorting all items by last used timestamp. So it still possible hits performance you because of O(N*logN) complexity with a very large number.
+    > The current version is super naive. It's simply sorting all items by last used timestamp. So it still possibly hits performance because of O(N*logN) complexity with a very large number.
 
 ### How to implement your own policy
 
