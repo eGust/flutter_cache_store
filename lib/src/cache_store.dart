@@ -67,8 +67,7 @@ class CacheStore {
     final String key,
     final bool flushCache = false,
   }) async {
-    final itemKey = key ?? url;
-    final item = await _getItem(itemKey);
+    final item = await _getItem(key, url);
     _policyManager.onAccessed(item, flushCache);
     _delayCleanUp();
     return Utils.download(
@@ -87,16 +86,18 @@ class CacheStore {
 
   static final _itemLock = new Lock();
 
-  Future<CacheItem> _getItem(String key) async {
-    var item = _cache[key];
+  Future<CacheItem> _getItem(String key, String url) async {
+    final k = key ?? url;
+    var item = _cache[k];
     if (item != null) return item;
 
     await _itemLock.synchronized(() {
-      item = _cache[key];
+      item = _cache[k];
       if (item != null) return;
 
-      item = CacheItem(key: key, filename: _policyManager.generateFilename());
-      _cache[key] = item;
+      final filename = _policyManager.generateFilename(key: key, url: url);
+      item = CacheItem(key: k, filename: filename);
+      _cache[k] = item;
       _policyManager.onAdded(item);
     });
     return item;

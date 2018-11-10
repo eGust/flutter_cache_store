@@ -34,3 +34,31 @@ void api() async {
   // remove all cached files
   await store.clearAll();
 }
+
+// Extends a Policy class and override `generateFilename`
+class LRUCachePolicy extends LessRecentlyUsedPolicy {
+  LRUCachePolicy({int maxCount}) : super(maxCount: maxCount);
+
+  @override
+  String generateFilename({final String key, final String url}) =>
+      key; // use key as the filename
+}
+
+void customizedCacheFileStructure() async {
+  // Set it as your Policy
+  CacheStore.setPolicy(LRUCachePolicy(maxCount: 4096));
+
+  // get a singleton store instance
+  CacheStore store = await CacheStore.getInstance();
+
+  // fetch a file from an URL and cache it
+  String bookId = 'book123';
+  String chapterId = 'ch42';
+  String chapterUrl = 'https://example.com/book123/ch42';
+  File file = await store.getFile(
+    chapterUrl,
+    key: '$bookId/$chapterId', // use IDs as path and filename
+  );
+
+  // Your file will be cached as `$TEMP/cache_store/book123/ch42`
+}

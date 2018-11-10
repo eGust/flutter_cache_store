@@ -3,7 +3,8 @@ part of flutter_cache_store;
 typedef OnDownloaded = Future<void> Function(CacheItem, Map<String, String>);
 
 abstract class CacheStorePolicy {
-  String generateFilename() => Utils.genName();
+  String generateFilename({final String key, final String url}) =>
+      Utils.genName();
   Future<void> clearAll(Iterable<CacheItem> allItems) async {}
 
   Future<void> onAdded(final CacheItem addedItem) async {}
