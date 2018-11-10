@@ -41,7 +41,7 @@ class Utils {
     OnDownloaded onDownloaded,
   ) async {
     final file = File(item.fullPath);
-    if (useCache && (await file.exists() || await file.length() == 0))
+    if (useCache && await file.exists() && await file.length() != 0)
       return file;
 
     var lock = _downloadLocks[item.filename];
