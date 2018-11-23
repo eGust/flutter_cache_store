@@ -92,21 +92,58 @@ void customizedCacheFileStructure() async {
 
 ---
 
-## About Policy
+## Cache Policy
 
-> Currently, there is only one policy available. More policies may be added soon.
+- `LessRecentlyUsedPolicy`
 
-1. `LessRecentlyUsedPolicy`
+  LRU policy. Less Recently Used files will be removed when reached `maxCount`. Each time you access a file will update its used timestamp.
 
-    Less Recently Used files will be removed when reached `maxCount`. Each time you access a file will update its used timestamp.
+  ```dart
+  new LessRecentlyUsedPolicy(
+    maxCount: 999,
+  );
+  ```
 
-    ```dart
-    new LessRecentlyUsedPolicy(
-      maxCount: 999, // default: 999
-    );
-    ```
+- `LeastFrequentlyUsedPolicy`
 
-    > The current version is super naive. It's simply sorting all items by last used timestamp. So it still possibly hits performance because of O(N*logN) complexity with a very large number.
+  LFU policy. Least Frequently Used files will be removed when reached `maxCount`. Each time you access a file will increase its hit count. After `hitAge` time the hit will expire. It will fallback to LRU policy if files have same hit count.
+
+  ```dart
+  new LeastFrequentlyUsedPolicy(
+    maxCount: 999,
+    hitAge: Duration(days: 30),
+  );
+  ```
+
+- `CacheControlPolicy`
+
+  `Cache-Control` header policy. This policy generally follows `max-age=<seconds>` or `s-maxage=<seconds>` rules of http response header [Cache-Control](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control). If the max-age-seconds not been set, it will use `minAge` unless you set it to `null`. The age will not be longer than `maxAge`.
+
+  ```dart
+  new CacheControlPolicy(
+    maxCount: 999,
+    minAge: Duration(seconds: 30), // nullable
+    maxAge: Duration(days: 30), // nullable
+  );
+  ```
+
+- `FifoPolicy`
+
+  First-In, First-Out policy, super simple and maybe for example only.
+
+  ```dart
+  new LessRecentlyUsedPolicy(
+    maxCount: 999, // default: 999
+  );
+  ```
+
+#### Performance Warning:
+
+- The implementation maintains all key-item in memory to improve the speed. So `maxCount` must between 1 and 100000 (100k) due to the cost of RAM and file system.
+
+- Currently, all the policies simply sort all items to expire files. It may hit performance due to `O(N*logN)` complexity.
+
+  > Will switch to priority queue which has `O(N*logK)` while `K` usually is a very small number.
 
 ### How to implement your own policy
 
@@ -152,10 +189,6 @@ abstract class CacheStorePolicy {
 }
 ```
 
-* Tips
+- Tips
 
-    > You don't have to implement all of the `onAdded`, `onAccessed` and `onDownloaded`. Only override the one you needed. For example:
-
-    1. You can create a FIFO policy with `onAdded`
-    2. Least Frequently Used policy can be implement with only `onAccessed`
-    3. Standard http cache can just use `onDownloaded`
+  > You don't have to implement all of the `onAdded`, `onAccessed` and `onDownloaded`.

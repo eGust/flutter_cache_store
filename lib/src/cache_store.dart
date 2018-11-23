@@ -1,4 +1,37 @@
-part of flutter_cache_store;
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synchronized/synchronized.dart';
+
+import 'utils.dart';
+import 'cache_store_policy.dart';
+import 'policies/less_recently_used_policy.dart';
+
+abstract class CacheItemPayload {}
+
+class CacheItem {
+  static String _rootPath;
+  static String get rootPath => _rootPath;
+
+  CacheItem({this.key, this.filename});
+
+  final String key, filename;
+  CacheItemPayload payload;
+
+  String get fullPath => '$_rootPath/$filename';
+
+  Map<String, dynamic> toJson() => {
+        'key': key,
+        'filename': filename,
+      };
+
+  CacheItem.fromJson(Map<String, dynamic> json)
+      : key = json['k'],
+        filename = json['fn'];
+}
 
 class CacheStore {
   CacheStore._();
