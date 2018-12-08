@@ -5,6 +5,7 @@ import '../cache_store_policy.dart';
 
 export '../cache_store.dart';
 
+/// [CacheItemPayload] to hold a timestamp field
 class TimestampPayload extends CacheItemPayload {
   TimestampPayload([int value]) {
     timestamp = value ?? DateTime.now().millisecondsSinceEpoch;
@@ -12,6 +13,9 @@ class TimestampPayload extends CacheItemPayload {
   int timestamp;
 }
 
+/// Generic base class for policies based on timestamps.
+/// This is a good example of how to implement a policy.
+/// You can override this class if you need a timestamp-based policy.
 abstract class TimestampBasedPolicy extends CacheStorePolicy {
   static const MAX_COUNT = 100 * 1000; // 100k
   TimestampBasedPolicy(this.maxCount) {

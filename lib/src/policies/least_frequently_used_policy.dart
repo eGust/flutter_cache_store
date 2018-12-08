@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../cache_store.dart';
 import '../cache_store_policy.dart';
 
+/// [CacheItemPayload] to hold [LeastFrequentlyUsedPolicy] data
 class LFUPolicy extends CacheItemPayload {
   LFUPolicy() : this.hits = [];
   LFUPolicy.from(List<int> list, {int chop}) {
@@ -30,9 +31,13 @@ class LFUPolicy extends CacheItemPayload {
   }
 }
 
+/// Implements a Least-Frequently-Used Policy.
 class LeastFrequentlyUsedPolicy extends CacheStorePolicy {
   static const MAX_COUNT = 100 * 1000; // 100k
 
+  /// When reach [maxCount], LFU file will be deleted first.
+  /// [hitAge] is how long it will take count as "used" after the file been visited.
+  /// Any `hit` after [hitAge] will expire.
   LeastFrequentlyUsedPolicy({
     this.maxCount = 999,
     Duration hitAge = const Duration(days: 30),

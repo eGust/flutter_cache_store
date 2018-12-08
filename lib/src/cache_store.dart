@@ -10,29 +10,45 @@ import 'utils.dart';
 import 'cache_store_policy.dart';
 import 'policies/less_recently_used_policy.dart';
 
+/// Must implement sub-class to hold the extra-data you want
 abstract class CacheItemPayload {}
 
+/// Base class to hold cache item data
 class CacheItem {
   static String _rootPath;
+
+  /// Returns the path where files will be cached
   static String get rootPath => _rootPath;
 
+  /// [key] is used to identify uniqueness of a file
+  /// [filename] is relative path and filename to [rootPath]
   CacheItem({this.key, this.filename});
 
-  final String key, filename;
+  /// Returns the unique key of an item
+  final String key;
+
+  /// Relative path and filename to [rootPath]
+  final String filename;
+
+  /// Holds extra-data required by a `Policy`
   CacheItemPayload payload;
 
+  /// Absolute path of the file
   String get fullPath => '$_rootPath/$filename';
 
+  /// Converts it to `JSON` to persist the item on disk
   Map<String, dynamic> toJson() => {
         'key': key,
         'filename': filename,
       };
 
+  /// Creates [CacheItem] from `JSON` data
   CacheItem.fromJson(Map<String, dynamic> json)
       : key = json['k'],
         filename = json['fn'];
 }
 
+/// Singleton object to manage cache
 class CacheStore {
   CacheStore._();
 
@@ -41,8 +57,11 @@ class CacheStore {
   static CacheStore _instance;
   static CacheStorePolicy _policyManager;
 
+  /// Public `SharedPreferences` instance
   static SharedPreferences get prefs => _prefs;
 
+  /// Must be called before [getInstance] or you will get an `Exception`.
+  /// You can create your own [CacheStorePolicy]
   static void setPolicy(final CacheStorePolicy policy) {
     if (_instance != null)
       throw Exception('Cache store already been instantiated');
@@ -50,6 +69,8 @@ class CacheStore {
     _policyManager = policy;
   }
 
+  /// Returns singleton of [CacheStore]
+  /// Set [clearNow] to `true` will immediately cleanup
   static Future<CacheStore> getInstance({final bool clearNow = false}) async {
     if (_instance == null) {
       await _lockCreation.synchronized(() async {
@@ -94,6 +115,10 @@ class CacheStore {
 
   final _cache = <String, CacheItem>{};
 
+  /// Returns `File` based on unique [key] from cache first, by default.
+  /// [key] will use [url] (including query params) when omitted.
+  /// A `GET` request with [headers] will be sent to [url] when not cached.
+  /// Set [flushCache] to `true` will force it to re-download the file
   Future<File> getFile(
     final String url, {
     final Map<String, String> headers,
@@ -107,6 +132,8 @@ class CacheStore {
         item, url, headers, !flushCache, _policyManager.onDownloaded);
   }
 
+  /// Forces to delete cached files with keys [urlOrKeys]
+  /// [urlOrKeys] is a list of keys. You may omit the key then will be the URL
   Future<void> flush(final List<String> urlOrKeys) {
     final items = urlOrKeys
         .map((key) => _cache[key])
@@ -177,6 +204,8 @@ class CacheStore {
     });
   }
 
+  /// Removes all cached files and persisted data on disk.
+  /// This method should be invoked when you want to release some space on disk.
   Future<void> clearAll() => _cleanLock.synchronized(() async {
         final items = _cache.values.toList();
         _cache.clear();

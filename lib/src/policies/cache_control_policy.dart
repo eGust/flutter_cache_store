@@ -1,6 +1,11 @@
 import 'timestamp_based_policy.dart';
 
+/// Implements a very basic Policy of HTTP `Cache-Control`
 class CacheControlPolicy extends TimestampBasedPolicy {
+  /// When cached files reach [maxCount], files with least age to live will be removed first.
+  /// Be careful of [minAge]. Your app may still need it for a while.
+  /// Both [minAge] and [maxAge] will override `max-age` or `s-maxage` header.
+  /// Set [maxAge] to `null` to make it follow `max-age` or `s-maxage` rule.
   CacheControlPolicy({
     int maxCount = 999,
     Duration minAge = const Duration(seconds: 30),

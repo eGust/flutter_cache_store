@@ -1,6 +1,11 @@
 # Change Log
 
-## [0.3.0-RC1] - Released on 2018-11-24
+## [0.3.0-RC2] - Released on 2018-12-08
+
+- Added inline documents.
+- `LessRecentlyUsedPolicy` has been tested for a while and worked pretty well.
+
+## [0.3.0-RC1] - Updated on 2018-11-24
 
 - Added `LeastFrequentlyUsedPolicy`, `CacheControlPolicy` and `FifoPolicy`.
 - File structure changes.

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:synchronized/synchronized.dart';
 import '../flutter_cache_store.dart';
 
+/// Some helpers for internal usage
 class Utils {
   static final _rand = Random.secure();
   static const _EFF_TIME_FLAG = 0x2000 * (1 << 32) - 1; // 407+ day
@@ -16,8 +17,10 @@ class Utils {
     return 95 + x - 36;
   }
 
+  /// Returns a random number based on timestamp. This number repeat every ~407 days
   static int genNow() => DateTime.now().microsecondsSinceEpoch & _EFF_TIME_FLAG;
 
+  /// Returns a random filename with 11 chars based on timestamp
   static String genName() {
     final codes = List<int>(11);
     var x = genUniqId();
@@ -29,10 +32,15 @@ class Utils {
     return String.fromCharCodes(codes);
   }
 
+  /// Generates a random number combined based on timestamp
   static int genUniqId() => (_rand.nextInt(0x80000) << 45) | genNow();
 
   static final _downloadLocks = <String, Lock>{};
 
+  /// Makes a `GET` request to [url] and save it to [item.fullPath]
+  /// [url] and Optional [headers] parameters will pass to `http.get`
+  /// set [useCache] to `false` will force downloading regardless cached or not
+  /// [onDownloaded] event triggers when downloading is finished
   static Future<File> download(
     CacheItem item,
     String url,
@@ -55,13 +63,13 @@ class Utils {
       _downloadLocks[key] = lock;
       try {
         await lock.synchronized(() async {
-          final objs = await Future.wait([
+          final results = await Future.wait([
             file.create(recursive: true),
             http.get(url, headers: headers),
           ]);
 
-          final File f = objs.first;
-          final http.Response response = objs.last;
+          final File f = results.first;
+          final http.Response response = results.last;
 
           await Future.wait([
             onDownloaded(item, response.headers),
