@@ -31,7 +31,7 @@ class CacheControlPolicy extends TimestampBasedPolicy {
             : null)
         .where((s) => s != null);
 
-    var age = cc.isEmpty ? 0 : int.parse(cc.first, onError: (_) => 0);
+    var age = cc.isEmpty ? 0 : int.tryParse(cc.first) ?? 0;
     if (minAge != null && age < minAge) age = minAge;
     if (maxAge != null && age > maxAge) age = maxAge;
 

@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.3.1-RC2] - Released on 2018-12-08
+
+- Fixed deprecated `int.parse`.
+
 ## [0.3.0-RC2] - Released on 2018-12-08
 
 - Added inline documents.
