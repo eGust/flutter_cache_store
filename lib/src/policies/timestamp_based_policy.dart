@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../cache_store.dart';
 import '../cache_store_policy.dart';
 
+export 'dart:async';
 export '../cache_store.dart';
 
 /// [CacheItemPayload] to hold a timestamp field

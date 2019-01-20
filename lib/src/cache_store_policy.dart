@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'cache_store.dart';
 import 'utils.dart';
+
+export 'dart:async';
 
 typedef OnDownloaded = Future<void> Function(CacheItem, Map<String, String>);
 

@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.3.2+2] - Released on 2019-01-20
+
+- Fixed stupid Health suggestions.
+
 ## [0.3.2] - Released on 2019-01-15
 
 - First official release. Nothing changed.
