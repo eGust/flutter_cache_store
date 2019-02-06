@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.4.0] - Released on 2019-02-06
+
+- Added `CustomFetch` support:
+  - Now you can use custom function to fetch data instead of `http.get`.
+  - Added named optional parameter `Map<String, dynamic> custom` to `getFile`, so you can pass custom data to your custom fetch function.
+
 ## [0.3.2+2] - Released on 2019-01-20
 
 - Fixed stupid Health suggestions.

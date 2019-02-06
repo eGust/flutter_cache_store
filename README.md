@@ -31,14 +31,22 @@ void api() async {
 
   // get a singleton store instance
   CacheStore store = await CacheStore.getInstance(
-      clearNow: true // default: false - whether to clean up immediately
-      );
+    clearNow: true, // default: false - whether to clean up immediately
+    httpGetter: myFetch, // default: null - a shortcut of `CacheStore.fetch`
+  );
+
+  // Optional:
+  // You can change custom fetch method at anytime.
+  // Set it to `null` will simply use `http.get`
+  CacheStore.fetch = myFetch;
 
   // fetch a file from an URL and cache it
   File file = await store.getFile(
     'url', // GET method
     key: null, // use custom string instead of URL
     headers: {}, // same as http.get
+    // Optional: Map<String, dynamic> any custom you want to pass to your custom fetch function.
+    custom: {'method': 'POST', 'body': 'test'},
     flushCache: false, // whether to re-download the file
   );
 
@@ -50,6 +58,21 @@ void api() async {
   // remove all cached files
   await store.clearAll();
 }
+
+// Custom fetch function.
+// A demo of how you can achieve a fetch supporting POST with body
+Future<Response> myFetch(url,
+    {Map<String, String> headers, Map<String, dynamic> custom}) {
+  final data = custom ?? {};
+  switch (data['method'] ?? '') {
+    case 'POST':
+      {
+        return post(url, headers: headers, body: data['body']);
+      }
+    default:
+      return get(url, headers: headers);
+  }
+}
 ```
 
 ### Cache File Structure
@@ -58,7 +81,7 @@ By default, the cached files will be saved under `$TEMP/cache_store`. `$TEMP` is
 
 You can customize your own file structure under `$TEMP/cache_store` by overriding Policy. There is an example:
 
-> Let's suppose your are developing a reader for novels, and your app will cache chapters of books. Your API returns some IDs of books and chapters, and an ID only contains digits.
+> Let's suppose your are developing a reader for novels, and your app will cache chapters of books. Your API returns some IDs of books and chapters, and an ID only contains letters and digits.
 
 ```dart
 // Extends a Policy class and override `generateFilename`
@@ -137,7 +160,7 @@ void customizedCacheFileStructure() async {
   );
   ```
 
-#### Performance Warning:
+### Performance Warning
 
 - The implementation maintains all key-item in memory to improve the speed. So `maxCount` must between 1 and 100000 (100k) due to the cost of RAM and file system.
 

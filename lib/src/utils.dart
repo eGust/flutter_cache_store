@@ -5,6 +5,15 @@ import 'package:http/http.dart' as http;
 import 'package:synchronized/synchronized.dart';
 import '../flutter_cache_store.dart';
 
+/// Custom Fetch method interface
+/// Optional parameter [custom] (`Map<String, dynamic>`) you can pass with [getFile]
+typedef CustomFetch = Future<http.Response> Function(dynamic url,
+    {Map<String, String> headers, Map<String, dynamic> custom});
+
+Future<http.Response> _defaultGetter(dynamic url,
+        {Map<String, String> headers, Map<String, dynamic> custom}) =>
+    http.get(url, headers: headers);
+
 /// Some helpers for internal usage
 class Utils {
   static final _rand = Random.secure();
@@ -43,11 +52,13 @@ class Utils {
   /// [onDownloaded] event triggers when downloading is finished
   static Future<File> download(
     CacheItem item,
-    String url,
-    Map<String, String> headers,
     bool useCache,
     OnDownloaded onDownloaded,
-  ) async {
+    String url, {
+    CustomFetch fetch,
+    Map<String, String> headers,
+    Map<String, dynamic> custom,
+  }) async {
     final file = File(item.fullPath);
     final key = item.filename;
     if (useCache &&
@@ -65,7 +76,7 @@ class Utils {
         await lock.synchronized(() async {
           final results = await Future.wait([
             file.create(recursive: true),
-            http.get(url, headers: headers),
+            (fetch ?? _defaultGetter)(url, headers: headers, custom: custom),
           ]);
 
           final File f = results.first;

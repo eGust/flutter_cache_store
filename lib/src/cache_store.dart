@@ -57,6 +57,10 @@ class CacheStore {
   static CacheStore _instance;
   static CacheStorePolicy _policyManager;
 
+  /// A simple callback function to customize your own fetch method.
+  /// You can change it anytime. See its interface: [CustomFetch]
+  static CustomFetch fetch;
+
   /// Public `SharedPreferences` instance
   static SharedPreferences get prefs => _prefs;
 
@@ -71,7 +75,12 @@ class CacheStore {
 
   /// Returns singleton of [CacheStore]
   /// Set [clearNow] to `true` will immediately cleanup
-  static Future<CacheStore> getInstance({final bool clearNow = false}) async {
+  /// [httpGetter] is a shortcut to [CacheStore.fetch]
+  static Future<CacheStore> getInstance({
+    final bool clearNow = false,
+    final CustomFetch httpGetter,
+  }) async {
+    fetch = httpGetter;
     if (_instance == null) {
       await _lockCreation.synchronized(() async {
         if (_instance != null) return;
@@ -122,14 +131,15 @@ class CacheStore {
   Future<File> getFile(
     final String url, {
     final Map<String, String> headers,
+    final Map<String, dynamic> custom,
     final String key,
     final bool flushCache = false,
   }) async {
     final item = await _getItem(key, url);
     _policyManager.onAccessed(item, flushCache);
     _delayCleanUp();
-    return Utils.download(
-        item, url, headers, !flushCache, _policyManager.onDownloaded);
+    return Utils.download(item, !flushCache, _policyManager.onDownloaded, url,
+        headers: headers, custom: custom);
   }
 
   /// Forces to delete cached files with keys [urlOrKeys]
