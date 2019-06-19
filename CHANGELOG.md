@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.5.0] - Released on 2019-06-19
+
+- Nothing but dependencies upgrade
+
 ## [0.4.0] - Released on 2019-02-06
 
 - Added `CustomFetch` support:

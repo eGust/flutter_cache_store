@@ -1,0 +1,8 @@
+name: flutter_cache_store_example
+author: eGust<egustc@gmail.com>
+homepage: https://github.com/eGust/flutter_cache_store
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_cache_store: "^0.4.0"
