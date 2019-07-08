@@ -1,5 +1,10 @@
 # Change Log
 
+## [0.6.0] - Released on 2019-07-08
+
+- Fixed a bug `CacheStore.fetch` not working.
+- Added optional `CustomFetch fetch` parameter to `getFile`.
+
 ## [0.5.0] - Released on 2019-06-19
 
 - Nothing but dependencies upgrade

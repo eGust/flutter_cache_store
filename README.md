@@ -45,6 +45,7 @@ void api() async {
     'url', // GET method
     key: null, // use custom string instead of URL
     headers: {}, // same as http.get
+    fetch: myFetch, // Optional: CustomFunction for making custom request
     // Optional: Map<String, dynamic> any custom you want to pass to your custom fetch function.
     custom: {'method': 'POST', 'body': 'test'},
     flushCache: false, // whether to re-download the file

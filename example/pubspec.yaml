@@ -5,4 +5,5 @@ homepage: https://github.com/eGust/flutter_cache_store
 dependencies:
   flutter:
     sdk: flutter
-  flutter_cache_store: "^0.4.0"
+  flutter_cache_store:
+    path: ../

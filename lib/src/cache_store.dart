@@ -127,19 +127,22 @@ class CacheStore {
   /// Returns `File` based on unique [key] from cache first, by default.
   /// [key] will use [url] (including query params) when omitted.
   /// A `GET` request with [headers] will be sent to [url] when not cached.
-  /// Set [flushCache] to `true` will force it to re-download the file
+  /// Set [flushCache] to `true` will force it to re-download the file.
+  /// Optional [fetch] to override global [CustomFetch] for downloading.
+  /// Optional [custom] to pass to [CustomFetch] function.
   Future<File> getFile(
     final String url, {
     final Map<String, String> headers,
     final Map<String, dynamic> custom,
     final String key,
+    final CustomFetch fetch,
     final bool flushCache = false,
   }) async {
     final item = await _getItem(key, url);
     _policyManager.onAccessed(item, flushCache);
     _delayCleanUp();
     return Utils.download(item, !flushCache, _policyManager.onDownloaded, url,
-        headers: headers, custom: custom);
+        fetch: fetch ?? CacheStore.fetch, headers: headers, custom: custom);
   }
 
   /// Forces to delete cached files with keys [urlOrKeys]
