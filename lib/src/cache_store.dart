@@ -15,14 +15,13 @@ abstract class CacheItemPayload {}
 
 /// Base class to hold cache item data
 class CacheItem {
-  static String _rootPath;
-
-  /// Returns the path where files will be cached
-  static String get rootPath => _rootPath;
-
+  /// [store] is used to indicate the base file path [store.path]
   /// [key] is used to identify uniqueness of a file
-  /// [filename] is relative path and filename to [rootPath]
-  CacheItem({this.key, this.filename});
+  /// [filename] is relative path and filename to [store.path]
+  CacheItem({this.store, this.key, this.filename});
+
+  /// Returns the store owns the item
+  final CacheStore store;
 
   /// Returns the unique key of an item
   final String key;
@@ -34,7 +33,7 @@ class CacheItem {
   CacheItemPayload payload;
 
   /// Absolute path of the file
-  String get fullPath => '$_rootPath/$filename';
+  String get fullPath => '${store.path}/$filename';
 
   /// Converts it to `JSON` to persist the item on disk
   Map<String, dynamic> toJson() => {
@@ -43,73 +42,83 @@ class CacheItem {
       };
 
   /// Creates [CacheItem] from `JSON` data
-  CacheItem.fromJson(Map<String, dynamic> json)
-      : key = json['k'],
+  CacheItem.fromJson(CacheStore store, Map<String, dynamic> json)
+      : store = store,
+        key = json['k'],
         filename = json['fn'];
 }
 
 /// Singleton object to manage cache
 class CacheStore {
-  CacheStore._();
-
-  static final _lockCreation = new Lock();
-  static SharedPreferences _prefs;
-  static CacheStore _instance;
-  static CacheStorePolicy _policyManager;
+  /// Unique namespace
+  final String namespace;
+  final CacheStorePolicy policyManager;
+  String get path => namespace == null ? _rootPath : '${_rootPath}__$namespace';
 
   /// A simple callback function to customize your own fetch method.
   /// You can change it anytime. See its interface: [CustomFetch]
-  static CustomFetch fetch;
+  CustomFetch fetch;
+
+  CacheStore._(this.namespace, this.policyManager);
+
+  static final _lockCreation = new Lock();
+  static final Map<String, CacheStore> _cacheStores = {};
+  static SharedPreferences _prefs;
+  static String _rootPath;
 
   /// Public `SharedPreferences` instance
   static SharedPreferences get prefs => _prefs;
 
-  /// Must be called before [getInstance] or you will get an `Exception`.
-  /// You can create your own [CacheStorePolicy]
-  static void setPolicy(final CacheStorePolicy policy) {
-    if (_instance != null)
-      throw Exception('Cache store already been instantiated');
-    if (policy == null) throw Exception('Cannot pass null policy');
-    _policyManager = policy;
+  static Future<String> _getRootPath() async {
+    final tmpPath = (await getTemporaryDirectory()).path;
+    return '$tmpPath/$_DEFAULT_STORE_FOLDER';
   }
 
-  /// Returns singleton of [CacheStore]
+  static Future<void> _initStatic() async {
+    _rootPath ??= await _getRootPath();
+    _prefs ??= await SharedPreferences.getInstance();
+  }
+
+  /// Returns [CacheStore] instance, all parameters are optional
+  /// [namespace] is unique key and must be a valid filename
+  /// [policy] is [CacheStorePolicy] you want to use, [LessRecentlyUsedPolicy] by default
   /// Set [clearNow] to `true` will immediately cleanup
-  /// [httpGetter] is a shortcut to [CacheStore.fetch]
+  /// [fetch] is a shortcut to set [CacheStore.fetch]
   static Future<CacheStore> getInstance({
+    final String namespace,
+    final CacheStorePolicy policy,
     final bool clearNow = false,
-    final CustomFetch httpGetter,
+    final CustomFetch fetch,
   }) async {
-    fetch = httpGetter;
-    if (_instance == null) {
-      await _lockCreation.synchronized(() async {
-        if (_instance != null) return;
+    CacheStore instance;
+    await _lockCreation.synchronized(() async {
+      instance = _cacheStores[namespace];
+      if (instance != null) return;
 
-        final tmpPath = (await getTemporaryDirectory()).path;
-        CacheItem._rootPath = '$tmpPath/$_DEFAULT_STORE_FOLDER';
-        _prefs = await SharedPreferences.getInstance();
-        _policyManager ??= LessRecentlyUsedPolicy();
+      await _initStatic();
 
-        _instance = CacheStore._();
-        await _instance._init(clearNow);
-      });
-    }
+      instance = CacheStore._(namespace, policy ?? LessRecentlyUsedPolicy());
+      instance.fetch = fetch;
+      await instance._init(clearNow);
+    });
 
-    return _instance;
+    return instance;
   }
 
   static const _PREF_KEY = 'CACHE_STORE';
   static const _DEFAULT_STORE_FOLDER = 'cache_store';
   static List<CacheItem> _recycledItems;
 
+  String get prefKey => namespace == null ? _PREF_KEY : '$_PREF_KEY/$namespace';
+
   Future<void> _init(final bool clearNow) async {
     final Map<String, dynamic> data =
-        jsonDecode(_prefs.getString(_PREF_KEY) ?? '{}');
+        jsonDecode(prefs.getString(prefKey) ?? '{}');
     final items = (data['cache'] as List ?? [])
-        .map((json) => CacheItem.fromJson(json))
+        .map((json) => CacheItem.fromJson(this, json))
         .toList();
 
-    (await _policyManager.restore(items))
+    (await policyManager.restore(items))
         .where((item) => item.key != null && item.filename != null)
         .forEach((item) => _cache[item.key] = item);
 
@@ -128,8 +137,8 @@ class CacheStore {
   /// [key] will use [url] (including query params) when omitted.
   /// A `GET` request with [headers] will be sent to [url] when not cached.
   /// Set [flushCache] to `true` will force it to re-download the file.
-  /// Optional [fetch] to override global [CustomFetch] for downloading.
-  /// Optional [custom] to pass to [CustomFetch] function.
+  /// Optional [fetch] to override [CacheStore.fetch] for downloading.
+  /// Optional [custom] data to pass to [fetch] or [CacheStore.fetch] function.
   Future<File> getFile(
     final String url, {
     final Map<String, String> headers,
@@ -139,10 +148,10 @@ class CacheStore {
     final bool flushCache = false,
   }) async {
     final item = await _getItem(key, url);
-    _policyManager.onAccessed(item, flushCache);
+    policyManager.onAccessed(item, flushCache);
     _delayCleanUp();
-    return Utils.download(item, !flushCache, _policyManager.onDownloaded, url,
-        fetch: fetch ?? CacheStore.fetch, headers: headers, custom: custom);
+    return Utils.download(item, !flushCache, policyManager.onDownloaded, url,
+        fetch: fetch ?? this.fetch, headers: headers, custom: custom);
   }
 
   /// Forces to delete cached files with keys [urlOrKeys]
@@ -153,11 +162,11 @@ class CacheStore {
         .where((item) => item != null)
         .toList();
     final futures = items.map(_removeFile).toList();
-    futures.add(_policyManager.onFlushed(items));
+    futures.add(policyManager.onFlushed(items));
     return Future.wait(futures);
   }
 
-  static final _itemLock = new Lock();
+  final _itemLock = new Lock();
 
   Future<CacheItem> _getItem(String key, String url) async {
     final k = key ?? url;
@@ -168,16 +177,16 @@ class CacheStore {
       item = _cache[k];
       if (item != null) return;
 
-      final filename = _policyManager.generateFilename(key: key, url: url);
-      item = CacheItem(key: k, filename: filename);
+      final filename = policyManager.generateFilename(key: key, url: url);
+      item = CacheItem(store: this, key: k, filename: filename);
       _cache[k] = item;
-      _policyManager.onAdded(item);
+      policyManager.onAdded(item);
     });
     return item;
   }
 
-  static bool _delayedCleaning = false;
-  static final _cleanLock = new Lock();
+  bool _delayedCleaning = false;
+  final _cleanLock = new Lock();
   int _lastCacheHash;
 
   Future<void> _removeFile(CacheItem item) async {
@@ -194,7 +203,7 @@ class CacheStore {
           await Future.wait(items.map(_removeFile));
         }
 
-        final removedKeys = await _policyManager.cleanup(_cache.values);
+        final removedKeys = await policyManager.cleanup(_cache.values);
         await Future.wait(
             removedKeys.map((item) => _removeFile(_cache.remove(item.key))));
 
@@ -202,7 +211,7 @@ class CacheStore {
         if (_lastCacheHash == cacheString.hashCode) return;
 
         _lastCacheHash = cacheString.hashCode;
-        await _prefs.setString(_PREF_KEY, cacheString);
+        await prefs.setString(prefKey, cacheString);
       });
 
   static const _DELAY_DURATION = Duration(seconds: 60);
@@ -225,12 +234,12 @@ class CacheStore {
 
         await Future.wait([
           _removeCacheFolder(),
-          _policyManager.clearAll(items),
+          policyManager.clearAll(items),
         ]);
       });
 
   Future<void> _removeCacheFolder() async {
-    final dir = Directory(CacheItem._rootPath);
+    final dir = Directory(path);
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }

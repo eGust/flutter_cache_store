@@ -11,21 +11,19 @@ void demo(String url) async {
 
 // [BASIC OPTIONS]
 void api() async {
-  // set expiration policy.
-  // must be called before `CacheStore.getInstance` or will raise an exception.
-  // default: LessRecentlyUsedPolicy(maxCount: 999)
-  CacheStore.setPolicy(LessRecentlyUsedPolicy(maxCount: 4096));
-
-  // get a singleton store instance
+  // get store instance
   CacheStore store = await CacheStore.getInstance(
+    namespace:
+        'unique_name', // default: null - valid filename used as unique id
+    policy:
+        LeastFrequentlyUsedPolicy(), // default: null - will use `LessRecentlyUsedPolicy()`
     clearNow: true, // default: false - whether to clean up immediately
-    httpGetter: myFetch, // default: null - a shortcut of `CacheStore.fetch`
+    fetch: myFetch, // default: null - a shortcut of `CacheStore.fetch`
   );
 
-  // Optional:
   // You can change custom fetch method at anytime.
   // Set it to `null` will simply use `http.get`
-  CacheStore.fetch = myFetch;
+  store.fetch = myFetch;
 
   // fetch a file from an URL and cache it
   File file = await store.getFile(
@@ -73,11 +71,11 @@ class LRUCachePolicy extends LessRecentlyUsedPolicy {
 }
 
 void customizedCacheFileStructure() async {
-  // Set it as your Policy
-  CacheStore.setPolicy(LRUCachePolicy(maxCount: 4096));
-
-  // get a singleton store instance
-  CacheStore store = await CacheStore.getInstance();
+  // get store instance
+  CacheStore store = await CacheStore.getInstance(
+    policy: LRUCachePolicy(maxCount: 4096),
+    namespace: 'my_store',
+  );
 
   // fetch a file from an URL and cache it
   String bookId = 'book123';
@@ -88,5 +86,5 @@ void customizedCacheFileStructure() async {
     key: '$bookId/$chapterId', // use IDs as path and filename
   );
 
-  // Your file will be cached as `$TEMP/cache_store/book123/ch42`
+  // Your file will be cached as `$TEMP/cache_store__my_store/book123/ch42`
 }

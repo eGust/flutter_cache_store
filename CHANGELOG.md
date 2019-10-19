@@ -1,5 +1,36 @@
 # Change Log
 
+## [0.7.0] - Released on 2019-10-19
+
+- Added `namespace` to support multiple instances
+- Breaking Changes:
+  - Removed static `CacheStore.setPolicy` method
+  - Moved `CacheStore.fetch` to instance field
+  - Renamed `CacheStore.getInstance` parameter `httpGetter` to `fetch`
+
+### Upgrade Guide
+
+1. remove `CacheStore.setPolicy` and set the policy in `CacheStore.getInstance`. For example, `CacheStore.getInstance(policy: LessRecentlyUsedPolicy(maxCount: 4096))`
+2. if `httpGetter: myFetch` is used in `CacheStore.getInstance`, rename it to `fetch: myFetch`
+3. any `CacheStore.fetch = myFetch` should be `store.fetch = myFetch`
+
+For instance, old API:
+
+```diff
+void foo() async {
+- CacheStore.setPolicy(LessRecentlyUsedPolicy(maxCount: 4096)); // 1
+  CacheStore store = await CacheStore.getInstance(
++   policy: LessRecentlyUsedPolicy(maxCount: 4096), // 1
+    clearNow: true,
+-   httpGetter: bar, // 2
++   fetch: bar, // 2
+  );
+
+- CacheStore.fetch = baz; // 3
++ store.fetch = baz; // 3
+}
+```
+
 ## [0.6.0] - Released on 2019-07-08
 
 - Fixed a bug `CacheStore.fetch` not working.
