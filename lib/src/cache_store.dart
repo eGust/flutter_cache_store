@@ -37,8 +37,8 @@ class CacheItem {
 
   /// Converts it to `JSON` to persist the item on disk
   Map<String, dynamic> toJson() => {
-        'key': key,
-        'filename': filename,
+        'k': key,
+        'fn': filename,
       };
 
   /// Creates [CacheItem] from `JSON` data

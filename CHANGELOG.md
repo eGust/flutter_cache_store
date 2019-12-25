@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.7.1] - Released on 2019-12-25
+
+- Fixed serialization issue
+
 ## [0.7.0] - Released on 2019-10-19
 
 - Added `namespace` to support multiple instances
