@@ -1,5 +1,5 @@
 .DS_Store
-.flutter-plugins
+.flutter-plugins*
 .metadata
 .packages
 .pub/
