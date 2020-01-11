@@ -42,7 +42,7 @@ class CacheControlPolicy extends TimestampBasedPolicy {
     final ts = now();
     final expired = <CacheItem>[];
     final list = allItems.where((item) {
-      if (getTimestamp(item) > ts) return true;
+      if ((getTimestamp(item) ?? 0) > ts) return true;
       expired.add(item);
       return false;
     }).toList();

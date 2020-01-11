@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.7.2] - Released on 2020-01-11
+
+- Rewrote cleanup logic
+
 ## [0.7.1] - Released on 2019-12-25
 
 - Fixed serialization issue

@@ -1,7 +1,6 @@
 name: flutter_cache_store
 description: More configurable cache manager for Flutter. Cache http get requests to mobile devices file system.
-version: 0.7.1
-author: eGust<egustc@gmail.com>
+version: 0.7.2
 homepage: https://github.com/eGust/flutter_cache_store
 
 environment:
