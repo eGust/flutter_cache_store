@@ -48,6 +48,12 @@ class CacheItem {
         filename = json['fn'];
 }
 
+bool isValidCacheItem(CacheItem item) =>
+    item.store != null &&
+    item.key != null &&
+    item.filename != null &&
+    File(item.fullPath).existsSync();
+
 /// Singleton object to manage cache
 class CacheStore {
   /// Unique namespace
@@ -107,7 +113,6 @@ class CacheStore {
 
   static const _PREF_KEY = 'CACHE_STORE';
   static const _DEFAULT_STORE_FOLDER = 'cache_store';
-  static List<CacheItem> _recycledItems;
 
   String get prefKey => namespace == null ? _PREF_KEY : '$_PREF_KEY/$namespace';
 
@@ -116,15 +121,12 @@ class CacheStore {
         jsonDecode(prefs.getString(prefKey) ?? '{}');
     final items = (data['cache'] as List ?? [])
         .map((json) => CacheItem.fromJson(this, json))
+        .toList()
+        .where(isValidCacheItem)
         .toList();
 
     (await policyManager.restore(items))
-        .where((item) => item.key != null && item.filename != null)
         .forEach((item) => _cache[item.key] = item);
-
-    final recycled =
-        items.where((item) => !_cache.containsKey(item.key)).toList();
-    _recycledItems = recycled.isEmpty ? null : recycled;
 
     if (clearNow) {
       await _cleanup();
@@ -197,21 +199,19 @@ class CacheStore {
   }
 
   Future<void> _cleanup() => _cleanLock.synchronized(() async {
-        if (_recycledItems != null) {
-          final items = _recycledItems;
-          _recycledItems = null;
-          await Future.wait(items.map(_removeFile));
-        }
-
-        final removedKeys = await policyManager.cleanup(_cache.values);
-        await Future.wait(
-            removedKeys.map((item) => _removeFile(_cache.remove(item.key))));
+        final expired = await policyManager.cleanup(_cache.values);
+        expired.forEach((item) {
+          _cache.remove(item.key);
+        });
 
         final cacheString = jsonEncode({'cache': _cache.values.toList()});
         if (_lastCacheHash == cacheString.hashCode) return;
 
         _lastCacheHash = cacheString.hashCode;
-        await prefs.setString(prefKey, cacheString);
+        await Future.wait([
+          prefs.setString(prefKey, cacheString),
+          _removeCachedFiles(),
+        ]);
       });
 
   static const _DELAY_DURATION = Duration(seconds: 60);
@@ -233,15 +233,27 @@ class CacheStore {
         _cache.clear();
 
         await Future.wait([
-          _removeCacheFolder(),
+          _removeCachedFiles(all: true),
           policyManager.clearAll(items),
         ]);
       });
 
-  Future<void> _removeCacheFolder() async {
+  Future<void> _removeCachedFiles({bool all = false}) async {
+    final ts = DateTime.now();
     final dir = Directory(path);
-    if (await dir.exists()) {
-      await dir.delete(recursive: true);
-    }
+    if (!await dir.exists()) return;
+
+    final entries =
+        await dir.list(recursive: false, followLinks: false).toList();
+    final items = Set.from(all ? [] : _cache.values.map((x) => x.fullPath));
+
+    entries.forEach((entry) async {
+      if (items.contains(entry.path)) return;
+      if (await FileSystemEntity.isDirectory(entry.path)) return;
+
+      final file = File(entry.path);
+      if (!all && ts.isBefore(await file.lastModified())) return;
+      file.delete(recursive: false);
+    });
   }
 }
