@@ -2,6 +2,9 @@ name: flutter_cache_store_example
 author: eGust<egustc@gmail.com>
 homepage: https://github.com/eGust/flutter_cache_store
 
+environment:
+  sdk: '>=2.10.0 <3.0.0'
+  
 dependencies:
   flutter:
     sdk: flutter
