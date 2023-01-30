@@ -7,12 +7,12 @@ import '../flutter_cache_store.dart';
 
 /// Custom Fetch method interface
 /// Optional parameter [custom] (`Map<String, dynamic>`) you can pass with [getFile]
-typedef CustomFetch = Future<http.Response> Function(dynamic url,
+typedef CustomFetch = Future<http.Response> Function(String url,
     {Map<String, String> headers, Map<String, dynamic> custom});
 
-Future<http.Response> _defaultGetter(dynamic url,
+Future<http.Response> _defaultGetter(String url,
         {Map<String, String> headers, Map<String, dynamic> custom}) =>
-    http.get(url, headers: headers);
+    http.get(Uri.parse(url), headers: headers);
 
 /// Some helpers for internal usage
 class Utils {
@@ -31,7 +31,7 @@ class Utils {
 
   /// Returns a random filename with 11 chars based on timestamp
   static String genName() {
-    final codes = List<int>(11);
+    final codes = List<int>.filled(11, 0);
     var x = genUniqId();
     codes[0] = _c64(((x & 0x7000000000000000) >> 60) | (x < 0 ? 8 : 0));
     x &= (1 << 60) - 1;

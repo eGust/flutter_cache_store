@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.8.1] - Released on 2020-01-11
+
+- Updated `http.get` interface
+
 ## [0.7.2] - Released on 2020-01-11
 
 - Rewrote cleanup logic
